@@ -46,6 +46,10 @@ module Html5 = struct
     let select = string_select
   end
 
+  module R = struct
+    include Html5.R
+  end
+
   module D = struct
     include Html5.D
     include Eliom_registration_base.Html5_forms.D
@@ -217,6 +221,7 @@ module Html5 = struct
     let get_unique_node context (elt: 'a Html5.elt) : Dom.node Js.t =
       match Xml.get_node (Html5.D.toelt elt) with
       | Xml.DomNode node -> node
+      | Xml.ReactNode s -> get_node elt
       | Xml.TyXMLNode desc ->
         let elt' = Html5.D.toelt elt in
           match Xml.get_node_id elt' with

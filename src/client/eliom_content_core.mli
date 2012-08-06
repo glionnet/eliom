@@ -65,10 +65,12 @@ module Xml : sig
     | AInt of int
     | AStr of string
     | AStrL of separator * string list
+
   val acontent : attrib -> acontent
 
   type racontent =
     | RA of acontent
+    | RAReact of acontent option React.signal
     | RACamlEventHandler of Dom_html.event caml_event_handler
     | RALazyStr of string Eliom_lazy.request
     | RALazyStrL of separator * string Eliom_lazy.request list
@@ -111,6 +113,7 @@ module Xml : sig
   val make_dom : ?id:node_id -> Dom.node Js.t -> elt
   val make_lazy : ?id:node_id -> elt lazy_t -> elt
   val force_lazy : elt -> unit
+  val make_react : ?id:node_id -> elt React.signal -> elt
 
   val make_process_node : ?id:string -> elt -> elt
   val make_request_node : elt -> elt
@@ -119,6 +122,8 @@ module Xml : sig
   type node =
     | DomNode of Dom.node Js.t
     | TyXMLNode of econtent
+    | ReactNode of elt React.signal
+
   val get_node : elt -> node
   val set_dom_node : elt -> Dom.node Js.t -> unit
 
@@ -223,6 +228,25 @@ module Html5 : sig
     val lazy_form:
       ([< Html5_types.form_attrib ], [< Html5_types.form_content_fun ], [> Html5_types.form ]) lazy_plus
 
+  end
+
+  module R: sig
+
+    val node : 'a elt React.signal -> 'a elt
+    val a_placeholder : string React.signal -> [> `Placeholder ] attrib
+    val a_class : string list React.signal -> [> `Class ] attrib
+    val a_title : string React.signal -> [> `Title ] attrib
+    val a_style : string React.signal -> [> `Style_Attr ] attrib
+    val a_value : string React.signal -> [> `Value ] attrib
+    val a_src : string React.signal -> [> `Src ] attrib
+    val a_alt : string React.signal -> [> `Alt ] attrib
+    val a_selected : bool React.signal -> [> `Selected ] attrib
+    val img :
+      src: string React.signal ->
+      alt: string React.signal ->
+      ?a:[< | Html5_types.common | `Height | `Ismap | `Width] attrib list ->
+      unit ->
+      [> `Img ] elt
   end
 
   (** Typed interface for building valid HTML5 tree (DOM semantics). See

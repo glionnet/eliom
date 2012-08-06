@@ -39,6 +39,7 @@ module Xml = struct
   and node =
     | DomNode of Dom.node Js.t
     | TyXMLNode of econtent
+    | ReactNode of elt React.signal
   and elt = {
     (* See Eliom_content.Html5.To_dom for the 'unwrap' function that convert
        the server's tree representation into the client one. *)
@@ -48,8 +49,8 @@ module Xml = struct
 
   let content e =
     match Lazy.force e.elt with
-    | DomNode _ -> assert false (* TODO *)
-    | TyXMLNode elt -> elt
+      | ReactNode _ | DomNode _ -> assert false (* TODO *)
+      | TyXMLNode elt -> elt
   let get_node e = Lazy.force e.elt
   let set_dom_node elt node = elt.elt <- Lazy.lazy_from_val (DomNode node)
   let get_node_id elt = elt.node_id
@@ -64,6 +65,8 @@ module Xml = struct
     in
     { node_id = id; elt = Lazy.lazy_from_fun f }
   let force_lazy { elt } = ignore (Lazy.force elt)
+
+  let make_react ?(id = NoId) signal = {elt = Lazy.lazy_from_val (ReactNode signal); node_id = id; }
 
   let empty () = make Empty
 
@@ -281,6 +284,25 @@ module Html5 = struct
 		  toelt (Eliom_lazy.force elt1)
 		  :: toeltl (Eliom_lazy.force elts))))
 
+  end
+
+
+
+  module R = struct
+
+    let node s = Xml.make_react s
+    let a_placeholder s = Xml.react_string_attrib "placeholder" s
+    let a_class s = Xml.react_space_sep_attrib "class" s
+    let a_title s = Xml.react_string_attrib "title" s
+    let a_style s = Xml.react_string_attrib "style" s
+    let a_value s = Xml.react_string_attrib "value" s
+    let a_src s = Xml.react_string_attrib "src" s
+    let a_alt s = Xml.react_string_attrib "alt" s
+    let a_selected s = Xml.react_poly_attrib "selected" "selected" s
+
+    let img ~src ~alt ?(a = []) () =
+      let a = (a_src src) :: (a_alt alt) :: a in
+      Xml.leaf ~a "img"
   end
 
   module F = struct

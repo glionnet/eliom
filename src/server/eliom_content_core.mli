@@ -76,6 +76,7 @@ module Xml : sig
 
   type racontent =
     | RA of acontent
+    | RAReact of acontent option React.signal
     | RACamlEventHandler of Dom_html.event caml_event_handler
     | RALazyStr of string Eliom_lazy.request
     | RALazyStrL of separator * string Eliom_lazy.request list

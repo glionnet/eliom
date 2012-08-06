@@ -1198,6 +1198,9 @@ let rebuild_attrib node name a = match a with
 
 let rebuild_rattrib node ra = match Xml.racontent ra with
   | Xml.RA a -> rebuild_attrib node (Xml.aname ra) a
+  | Xml.RAReact s -> let _ = React.S.map (function
+      | None -> node##removeAttribute (js_name node (Xml.aname ra))
+      | Some v -> rebuild_attrib node (Xml.aname ra) v) s in ()
   | Xml.RACamlEventHandler ev -> register_event_handler node (Xml.aname ra, ev)
   | Xml.RALazyStr s ->
       node##setAttribute(js_name (Xml.aname ra), Js.string s)
@@ -1206,12 +1209,38 @@ let rebuild_rattrib node ra = match Xml.racontent ra with
   | Xml.RALazyStrL (Xml.Comma, l) ->
       node##setAttribute(js_name (Xml.aname ra), Js.string (String.concat "," l))
 
+let rec has_react = function
+  | [] -> false
+  | x::xs -> match Xml.get_node x with
+      | Xml.ReactNode _ -> true
+      | _ -> has_react xs
 
 let rec rebuild_node' elt =
   match Xml.get_node elt with
   | Xml.DomNode node ->
       (* assert (Xml.get_node_id node <> NoId); *)
       node
+  | Xml.ReactNode s ->
+    let o = (Dom_html.document##createElement (Js.string "span")  :> Dom.node Js.t)in
+    let node_signal = React.S.map ~eq:(fun _ _ -> false) rebuild_node' s in
+    let update n =
+      let o = match Xml.get_node elt with
+	| Xml.DomNode o -> o
+	| _ -> o in
+      Js.Opt.iter (o##parentNode) (fun parent ->
+	Js.Opt.iter (Dom.CoerceTo.element parent) (fun parent ->
+	  ignore ((Dom_html.element parent)##replaceChild(n, o))
+	)
+      );
+      Xml.set_dom_node elt n in
+    let _ = React.S.map ~eq:(fun _ _ -> false) update node_signal in
+    Lwt.async (fun () ->
+      Lwt_js.sleep 0.01 >>= fun () ->
+      update (React.S.value node_signal);
+      Lwt.return ()
+    );
+    Xml.set_dom_node elt o;
+    o
   | Xml.TyXMLNode raw_elt ->
       match Xml.get_node_id elt with
       | Xml.NoId -> raw_rebuild_node raw_elt
@@ -1235,7 +1264,7 @@ and raw_rebuild_node = function
   | Xml.Empty
   | Xml.Comment _ ->
       (* FIXME *)
-      (Dom_html.document##createTextNode (Js.string "") :> Dom.node Js.t)
+    (Dom_html.document##createTextNode (Js.string "") :> Dom.node Js.t)
   | Xml.EncodedPCDATA s
   | Xml.PCDATA s -> (Dom_html.document##createTextNode (Js.string s) :> Dom.node Js.t)
   | Xml.Entity s -> assert false (* FIXME *)
@@ -1246,7 +1275,24 @@ and raw_rebuild_node = function
   | Xml.Node (name,attribs,childrens) ->
     let node = Dom_html.document##createElement (Js.string name) in
     List.iter (rebuild_rattrib node) attribs;
-    List.iter (fun c -> Dom.appendChild node (rebuild_node' c)) childrens;
+    if has_react childrens
+    then
+      let all = List.rev_map (fun x -> match Xml.get_node x with
+	      | Xml.ReactNode s -> s
+	      | s -> React.S.const x) childrens in
+      let all = React.S.merge (fun acc s -> s :: acc) [] all in
+      let _ = React.S.map (fun l ->
+	      let rec loop = function
+	        | [],[] -> ()
+	        | o::os,n::ns ->
+	          let n = rebuild_node' n in
+	          ignore(node##replaceChild(n,o));
+	          loop (os,ns)
+	        | [],ns -> List.iter (fun n -> let n = rebuild_node' n in ignore(node##appendChild(n))) ns
+	        | os,[] -> List.iter (fun o -> ignore(node##removeChild(o))) os
+	      in loop (Dom.list_of_nodeList (node##childNodes), l)) all in
+      ()
+    else List.iter (fun c -> Dom.appendChild node (rebuild_node' c)) childrens;
     (node :> Dom.node Js.t)
 
 (** The first argument describes the calling function (if any) in case
