@@ -25,14 +25,17 @@ open Eliom_content_core
 module JsTable = Eliommod_jstable
 
 let init_client_app ?(ssl = false) ~hostname ?(port = 80) ~full_path () =
-  Eliom_process.set_sitedata {Eliom_types.site_dir = full_path;
-                              site_dir_string = String.concat "/" full_path};
+  Eliom_request_info.client_app_initialised := true;
+  Eliom_process.set_sitedata
+    {Eliom_types.site_dir = full_path;
+     site_dir_string = String.concat "/" full_path};
   Eliom_process.set_info {Eliom_common.cpi_ssl = ssl ;
                           cpi_hostname = hostname;
                           cpi_server_port = port;
                           cpi_original_full_path = full_path
                          };
   Eliom_process.set_request_cookies Ocsigen_cookies.Cookies.empty
+
 
 (* == Auxiliaries *)
 
@@ -1199,7 +1202,7 @@ let rebuild_attrib node name a = match a with
 let rebuild_rattrib node ra = match Xml.racontent ra with
   | Xml.RA a -> rebuild_attrib node (Xml.aname ra) a
   | Xml.RAReact s -> let _ = React.S.map (function
-      | None -> node##removeAttribute (js_name node (Xml.aname ra))
+      | None -> node##removeAttribute (js_name (Xml.aname ra))
       | Some v -> rebuild_attrib node (Xml.aname ra) v) s in ()
   | Xml.RACamlEventHandler ev -> register_event_handler node (Xml.aname ra, ev)
   | Xml.RALazyStr s ->
@@ -1215,14 +1218,14 @@ let rec has_react = function
       | Xml.ReactNode _ -> true
       | _ -> has_react xs
 
-let rec rebuild_node' elt =
+let rec rebuild_node' ns elt =
   match Xml.get_node elt with
   | Xml.DomNode node ->
       (* assert (Xml.get_node_id node <> NoId); *)
       node
   | Xml.ReactNode s ->
     let o = (Dom_html.document##createElement (Js.string "span")  :> Dom.node Js.t)in
-    let node_signal = React.S.map ~eq:(fun _ _ -> false) rebuild_node' s in
+    let node_signal = React.S.map ~eq:(fun _ _ -> false) (rebuild_node' ns) s in
     let update n =
       let o = match Xml.get_node elt with
 	| Xml.DomNode o -> o
@@ -1243,24 +1246,24 @@ let rec rebuild_node' elt =
     o
   | Xml.TyXMLNode raw_elt ->
       match Xml.get_node_id elt with
-      | Xml.NoId -> raw_rebuild_node raw_elt
+      | Xml.NoId -> raw_rebuild_node ns raw_elt
       | Xml.RequestId _ ->
           (* Do not look in request_nodes hashtbl: such elements have
              been bind while unwrapping nodes. *)
-          let node = raw_rebuild_node raw_elt in
+          let node = raw_rebuild_node ns raw_elt in
           Xml.set_dom_node elt node;
           node
       | Xml.ProcessId id ->
         let id = (Js.string id) in
         Js.Optdef.case (find_process_node id)
           (fun () ->
-            let node = raw_rebuild_node (Xml.content elt) in
+            let node = raw_rebuild_node ns (Xml.content elt) in
             register_process_node id node;
             node)
           (fun n -> (n:> Dom.node Js.t))
 
 
-and raw_rebuild_node = function
+and raw_rebuild_node ns = function
   | Xml.Empty
   | Xml.Comment _ ->
       (* FIXME *)
@@ -1273,7 +1276,14 @@ and raw_rebuild_node = function
     List.iter (rebuild_rattrib node) attribs;
     (node :> Dom.node Js.t)
   | Xml.Node (name,attribs,childrens) ->
-    let node = Dom_html.document##createElement (Js.string name) in
+    let ns = if name = "svg" then `SVG else ns in
+    let node =
+      match ns with
+      | `HTML5 -> Dom_html.document##createElement (Js.string name)
+      | `SVG ->
+	let svg_ns = "http://www.w3.org/2000/svg" in
+	Dom_html.document##createElementNS (Js.string svg_ns, Js.string name)
+    in
     List.iter (rebuild_rattrib node) attribs;
     if has_react childrens
     then
@@ -1284,35 +1294,43 @@ and raw_rebuild_node = function
       let _ = React.S.map (fun l ->
 	      let rec loop = function
 	        | [],[] -> ()
-	        | o::os,n::ns ->
-	          let n = rebuild_node' n in
+	        | o::ox,n::nx ->
+	          let n = rebuild_node' ns n in
 	          ignore(node##replaceChild(n,o));
-	          loop (os,ns)
-	        | [],ns -> List.iter (fun n -> let n = rebuild_node' n in ignore(node##appendChild(n))) ns
-	        | os,[] -> List.iter (fun o -> ignore(node##removeChild(o))) os
+	          loop (ox,nx)
+	        | [],nx -> List.iter (fun n -> let n = rebuild_node' ns n in ignore(node##appendChild(n))) nx
+	        | ox,[] -> List.iter (fun o -> ignore(node##removeChild(o))) ox
 	      in loop (Dom.list_of_nodeList (node##childNodes), l)) all in
       ()
-    else List.iter (fun c -> Dom.appendChild node (rebuild_node' c)) childrens;
+    else List.iter (fun c -> Dom.appendChild node (rebuild_node' ns c)) childrens;
     (node :> Dom.node Js.t)
 
-(** The first argument describes the calling function (if any) in case
-    of an error. *)
-let rebuild_node context elt =
-  let elt' = Html5.F.toelt elt in
+let rebuild_node_ns ns context elt' =
   trace "Rebuild node %a (%s)"
     (fun () e -> Eliom_content_core.Xml.string_of_node_id (Xml.get_node_id e))
     elt' context;
   if is_before_initial_load () then
-    error_any (rebuild_node' (Html5.F.toelt elt))
+    error_any (rebuild_node' ns elt')
       "Cannot apply %s%s before the document is initially loaded"
       context
       Xml.(match get_node_id elt' with
            | NoId -> " "
            | RequestId id -> " on request node "^id
            | ProcessId id -> " on global node "^id);
-  let node = Js.Unsafe.coerce (rebuild_node' elt') in
+  let node = Js.Unsafe.coerce (rebuild_node' ns elt') in
   flush_load_script ();
   node
+
+let rebuild_node_svg context elt =
+  let elt' = Svg.F.toelt elt in
+  rebuild_node_ns `SVG context elt'
+
+
+(** The first argument describes the calling function (if any) in case
+    of an error. *)
+let rebuild_node context elt =
+  let elt' = Html5.F.toelt elt in
+  rebuild_node_ns `HTML5 context elt'
 
 (******************************************************************************)
 (*                            Register unwrappers                             *)
