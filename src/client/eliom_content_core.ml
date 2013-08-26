@@ -129,6 +129,7 @@ module Xml = struct
   let set_classes_of_elt elt =
      match Lazy.force elt.elt with
       | DomNode _ -> failwith "Eliom_content_core.set_classes_of_elt"
+      | ReactNode _ -> failwith "Eliom_content_core.set_classes_of_elt"
       | TyXMLNode econtent ->
           { elt with elt = Lazy.lazy_from_val (TyXMLNode (set_classes elt.node_id econtent)) }
 
