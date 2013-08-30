@@ -44,6 +44,7 @@ module Xml : sig
 
   type ename = string
   type elt
+  type 'a wrap = 'a
   type econtent = private
     | Empty
     | Comment of string
@@ -139,6 +140,7 @@ module Svg : sig
       application. *)
 
   type +'a elt
+  type 'a wrap = 'a
   type +'a attrib
   type uri = Xml.uri
 
@@ -153,6 +155,8 @@ module Svg : sig
                             and type Xml.attrib = Xml.attrib
                             and type Xml.elt = Xml.elt
                               with type 'a elt = 'a elt
+                             and type 'a Xml.wrap = 'a
+                             and type 'a wrap = 'a
                               and type 'a attrib = 'a attrib
                               and type uri = uri
 
@@ -177,6 +181,8 @@ module Svg : sig
                             and type Xml.attrib = Xml.attrib
                             and type Xml.elt = Xml.elt
                               with type 'a elt = 'a elt
+                             and type 'a Xml.wrap = 'a
+                             and type 'a wrap = 'a
                               and type 'a attrib = 'a attrib
                               and type uri = uri
 
@@ -222,6 +228,7 @@ module Html5 : sig
       application. *)
 
   type +'a elt
+  type 'a wrap = 'a
   type +'a attrib
   type uri = Xml.uri
 
@@ -237,6 +244,8 @@ module Html5 : sig
                    and type Xml.elt = Xml.elt
                    with module Svg := Svg.F.Raw
                    with type 'a elt = 'a elt
+                    and type 'a Xml.wrap = 'a
+                    and type 'a wrap = 'a
                    and type 'a attrib = 'a attrib
                    and type uri = uri
 
@@ -268,6 +277,8 @@ module Html5 : sig
                    and type Xml.elt = Xml.elt
                    and module Svg := Svg.D.Raw
                    and type 'a elt = 'a elt
+                   and type 'a Xml.wrap = 'a
+                   and type 'a wrap = 'a
                    and type 'a attrib = 'a attrib
                    and type uri = uri
     include module type of Raw (*BB TODO Hide untyped [input]. *)
