@@ -274,8 +274,7 @@ module Html5 : sig
   module R: sig
 
     val node : 'a elt React.signal -> 'a elt
-    module Xml_w : Xml_wrap.T
-    module Xml_wed : Xml_sigs.Wraped with type 'a wrap = 'a Xml_w.t
+    (* val attrib : 'a attrib React.signal -> 'a attrib *) (* Need to change attrib type for this *)
     module Raw : Html5_sigs.T
                    with type Xml.uri = Xml.uri
                    and type Xml.event_handler = Xml.event_handler
