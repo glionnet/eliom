@@ -26,7 +26,7 @@ open Eliom_lib
 
 type content_ns = [ `HTML5 | `SVG ]
 
-module Xml = struct
+module XmlNoWrap = struct
 
   include RawXML
 
@@ -140,6 +140,11 @@ module Xml = struct
 
 end
 
+module Xml = struct
+  include XmlNoWrap
+  type 'a wrap = 'a
+end
+
 module X = Xml
 
 module Svg = struct
@@ -201,6 +206,7 @@ module Svg = struct
   end
 
   type 'a elt = 'a F.elt
+  type 'a wrap = 'a F.wrap
   type 'a attrib = 'a F.attrib
   type uri = F.uri
 
@@ -475,6 +481,7 @@ module Html5 = struct
   end
 
   type +'a elt = 'a F.elt
+  type 'a wrap = 'a F.wrap
   type +'a attrib = 'a F.attrib
   type uri = F.uri
 
