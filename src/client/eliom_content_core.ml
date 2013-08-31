@@ -337,18 +337,54 @@ module Html5 = struct
   module R = struct
 
     let node s = Xml.make_react s
-    let a_placeholder s = Xml.react_string_attrib "placeholder" s
-    let a_class s = Xml.react_space_sep_attrib "class" s
-    let a_title s = Xml.react_string_attrib "title" s
-    let a_style s = Xml.react_string_attrib "style" s
-    let a_value s = Xml.react_string_attrib "value" s
-    let a_src s = Xml.react_string_attrib "src" s
-    let a_alt s = Xml.react_string_attrib "alt" s
-    let a_selected s = Xml.react_poly_attrib "selected" "selected" s
 
-    let img ~src ~alt ?(a = []) () =
-      let a = (a_src src) :: (a_alt alt) :: a in
-      Xml.leaf ~a "img"
+    module Xml_w = struct
+      type 'a t = 'a React.signal
+      let return x = Lwt_react.S.return x
+      let bind x = Lwt_react.S.bind x
+      let fmap x = React.S.map x
+      let fmap2 x = React.S.l2 x
+      let fmap3 x = React.S.l3 x
+      let fmap4 x = React.S.l4 x
+      let fmap5 x = React.S.l5 x
+    end
+    module Xml_wed =
+    struct
+      type 'a wrap = 'a Xml_w.t
+      type uri = Xml.uri
+      let string_of_uri = Xml.string_of_uri
+      let uri_of_string = Xml.uri_of_string
+      type aname = Xml.aname
+      type event_handler = Xml.event_handler
+      type attrib = Xml.attrib
+
+      let float_attrib name s : attrib = name, Xml.RAReact (Xml_w.fmap (fun f -> Some (Xml.AFloat f)) s)
+      let int_attrib name s = name, Xml.RAReact (React.S.map (fun f -> Some (Xml.AInt f)) s)
+      let string_attrib name s = name, Xml.RAReact (React.S.map (fun f -> Some (Xml.AStr f)) s)
+      let space_sep_attrib name s = name, Xml.RAReact (React.S.map (fun f -> Some(Xml.AStrL (Xml.Space,f))) s)
+      let comma_sep_attrib name s = name, Xml.RAReact (React.S.map (fun f -> Some (Xml.AStrL (Xml.Comma,f))) s)
+      let event_handler_attrib = Xml.event_handler_attrib
+      let uri_attrib name value = name, Xml.RAReact (React.S.map (fun f -> Some (Xml.AStr (Eliom_lazy.force f))) value)
+      let uris_attrib name value = name, Xml.RAReact (React.S.map (fun f -> Some (Xml.AStrL (Xml.Space,Eliom_lazy.force f))) value)
+
+      type elt = Xml.elt
+      type ename = Xml.ename
+
+      let empty = Xml.empty
+      let comment = Xml.comment
+      let pcdata s = Xml.make_react (React.S.map Xml.pcdata s)
+      let encodedpcdata s = Xml.make_react (React.S.map Xml.encodedpcdata s)
+      let entity = Xml.entity
+      let leaf = Xml.leaf
+      let node ?a name l = Xml.make_react (React.S.map (fun l -> Xml.node ?a name l) l)
+      let cdata = Xml.cdata
+      let cdata_script = Xml.cdata_script
+      let cdata_style = Xml.cdata_style
+    end
+
+    module Svg_w = Svg_f.MakeWraped(Xml_w)(Xml_wed)
+    module Raw = Html5_f.MakeWraped(Xml_w)(Xml_wed)(Svg_w)
+    include Raw
   end
 
   module F = struct

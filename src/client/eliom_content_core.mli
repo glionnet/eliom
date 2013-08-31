@@ -265,21 +265,22 @@ module Html5 : sig
   module R: sig
 
     val node : 'a elt React.signal -> 'a elt
-    val a_placeholder : string React.signal -> [> `Placeholder ] attrib
-    val a_class : string list React.signal -> [> `Class ] attrib
-    val a_title : string React.signal -> [> `Title ] attrib
-    val a_style : string React.signal -> [> `Style_Attr ] attrib
-    val a_value : string React.signal -> [> `Value ] attrib
-    val a_src : string React.signal -> [> `Src ] attrib
-    val a_alt : string React.signal -> [> `Alt ] attrib
-    val a_selected : bool React.signal -> [> `Selected ] attrib
-    val img :
-      src: string React.signal ->
-      alt: string React.signal ->
-      ?a:[< | Html5_types.common | `Height | `Ismap | `Width] attrib list ->
-      unit ->
-      [> `Img ] elt
+    module Xml_w : Xml_wrap.T
+    module Xml_wed : Xml_sigs.Wraped with type 'a wrap = 'a Xml_w.t
+    module Raw : Html5_sigs.T
+                   with type Xml.uri = Xml.uri
+                   and type Xml.event_handler = Xml.event_handler
+                   and type Xml.attrib = Xml.attrib
+                   and type Xml.elt = Xml.elt
+                   and module Svg := Svg.D.Raw
+                   and type 'a elt = 'a elt
+                   and type 'a Xml.wrap = 'a React.signal
+                   and type 'a wrap = 'a React.signal
+                   and type 'a attrib = 'a attrib
+                   and type uri = uri
+    include module type of Raw
   end
+
 
   (** Typed interface for building valid HTML5 tree (DOM semantics). See
       {% <<a_api project="tyxml" | module type Html5_sigs.T >> %}. *)
